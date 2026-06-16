@@ -34,6 +34,16 @@
 
 凭据来自用户自己的合法易校园登录会话。插件不提供自动登录、抓包、验证码绕过或证书校验绕过能力。
 
+### 获取 shiroJID
+
+`shiroJID` 可以通过 HttpCanary 抓取自己设备上的易校园电费请求获取。打开易校园并进入电费页面后，在 HttpCanary 的抓包列表中找到
+`application.xiaofubao.com` 相关请求，进入请求详情，在 `Cookie` 字段里复制
+`shiroJID=...` 的值，或直接复制整段 Cookie 粘贴到插件管理页。
+
+请只抓取自己账号的合法登录会话，不要公开或分享 `shiroJID`，它等同于一段短期登录凭据。
+
+![HttpCanary 获取 shiroJID 示例](docs/assets/httpcanary-shirojid.jpg)
+
 `shiroJID` 输入框可粘贴纯值、`shiroJID=...` 或完整 Cookie 文本；插件只会
 提取并保存 `shiroJID`。接口返回 `success=true` 时，如果响应包含新的
 `shiroJID`，插件会自动续存并用于下一次查询。`204 请重新登录` 等失败响应
