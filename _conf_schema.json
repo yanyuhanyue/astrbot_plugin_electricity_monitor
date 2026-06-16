@@ -1,0 +1,26 @@
+{
+  "enabled": {
+    "description": "启用易校园电费监控",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后停止后台轮询和主动提醒，已有订阅与历史不会删除。"
+  },
+  "request_interval_seconds": {
+    "description": "易校园请求最小间隔（秒）",
+    "type": "float",
+    "default": 2.0,
+    "hint": "所有易校园请求全局串行，插件会强制不低于 2 秒。"
+  },
+  "request_timeout_seconds": {
+    "description": "单次请求超时（秒）",
+    "type": "float",
+    "default": 20.0,
+    "hint": "建议保持 10–30 秒。"
+  },
+  "scheduler_tick_seconds": {
+    "description": "调度检查间隔（秒）",
+    "type": "int",
+    "default": 30,
+    "hint": "用于检查到期订阅，不等于寝室查询频率。"
+  }
+}

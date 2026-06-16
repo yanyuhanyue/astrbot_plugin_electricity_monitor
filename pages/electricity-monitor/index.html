@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>易校园电费监控</title>
+  <link rel="stylesheet" href="./style.css?v=1.3.0">
+</head>
+<body>
+  <main class="page-shell">
+    <header class="page-header">
+      <div class="header-copy">
+        <p class="eyebrow">ASTRBOT PLUGIN</p>
+        <h1>易校园电费监控</h1>
+        <p>多会话、多寝室查询，低电量跨阈值提醒。</p>
+      </div>
+      <div class="header-actions">
+        <span id="runtimeStatus" class="status">正在连接</span>
+        <button id="refreshButton" class="button button-outline">刷新</button>
+      </div>
+    </header>
+
+    <section class="summary-grid" aria-label="运行概览">
+      <article class="summary-card">
+        <span class="summary-icon chat" aria-hidden="true"></span>
+        <div>
+          <strong id="sessionCount">0</strong>
+          <span>近期会话</span>
+          <small>当前会话数量</small>
+        </div>
+      </article>
+      <article class="summary-card">
+        <span class="summary-icon room" aria-hidden="true"></span>
+        <div>
+          <strong id="subscriptionCount">0</strong>
+          <span>寝室订阅</span>
+          <small>已订阅寝室数量</small>
+        </div>
+      </article>
+      <article class="summary-card">
+        <span class="summary-icon shield" aria-hidden="true"></span>
+        <div>
+          <strong id="activeCount">0</strong>
+          <span>监控中</span>
+          <small>正在监控的寝室</small>
+        </div>
+      </article>
+      <article class="summary-card">
+        <span class="summary-icon diag" aria-hidden="true"></span>
+        <div>
+          <strong id="diagnosticCount">0</strong>
+          <span>诊断记录</span>
+          <small>历史诊断记录数</small>
+        </div>
+      </article>
+    </section>
+
+    <nav class="tabs" aria-label="插件管理">
+      <button class="tab active" data-tab="subscriptions">寝室订阅</button>
+      <button class="tab" data-tab="credentials">登录与通知</button>
+      <button class="tab" data-tab="history">30 天趋势</button>
+      <button class="tab" data-tab="diagnostics">诊断</button>
+    </nav>
+
+    <section class="panel active" id="panel-subscriptions">
+      <article class="card">
+        <div class="card-header">
+          <div>
+            <h2>会话与订阅</h2>
+            <p>选择会话、复制已有订阅，或创建新的寝室监控。</p>
+          </div>
+        </div>
+        <div class="control-grid">
+          <label class="field">会话
+            <select id="sessionSelect"></select>
+          </label>
+          <label class="field">复制已有订阅
+            <select id="copySubscriptionSelect"></select>
+          </label>
+          <div class="button-row">
+            <button id="copySubscriptionButton" class="button button-outline">复制到当前会话</button>
+            <button id="importSessionsButton" class="button button-outline">导入已有会话</button>
+            <button id="newSubscriptionButton" class="button">新增寝室</button>
+          </div>
+        </div>
+        <p class="description">私聊昵称来自机器人收到消息时的平台昵称；历史导入拿不到昵称时只显示 QQ 号。</p>
+      </article>
+
+      <div class="content-grid">
+        <article class="card subscription-card">
+          <div class="card-header row">
+            <div>
+              <h2>当前会话订阅</h2>
+              <p>低电量优先展示，便于快速处理风险寝室。</p>
+            </div>
+            <span id="currentSessionBadge" class="badge">0</span>
+          </div>
+          <div class="table-wrap">
+            <table class="subscription-table">
+              <thead>
+                <tr><th>别名</th><th>最新电量</th><th>阈值 / 频率</th><th>状态</th><th>操作</th></tr>
+              </thead>
+              <tbody id="subscriptionBody"></tbody>
+            </table>
+          </div>
+
+          <section class="quick-history">
+            <div class="card-header row compact">
+              <div>
+                <h3 id="quickHistoryTitle">近30天电量趋势</h3>
+                <p id="quickHistoryCaption">优先展示当前会话电量最低的寝室。</p>
+              </div>
+              <button id="quickHistoryButton" class="button button-outline button-sm">更多趋势</button>
+            </div>
+            <div class="chart-frame">
+              <canvas id="quickHistoryChart" width="760" height="260"></canvas>
+            </div>
+            <div id="quickHistorySummary" class="description">当前会话暂无可展示趋势。</div>
+          </section>
+        </article>
+
+        <article class="card editor">
+          <div class="card-header">
+            <div>
+              <h2 id="editorTitle">新增寝室</h2>
+              <p>填写基础参数，然后逐级选择寝室。</p>
+            </div>
+          </div>
+          <input id="subscriptionId" type="hidden">
+          <label class="field">别名<input id="alias" maxlength="40" placeholder="例如：厚德苑6号240"></label>
+          <div class="form-two">
+            <label class="field">低电量阈值<input id="threshold" type="number" step="0.01" value="20"></label>
+            <label class="field">单位<input id="unit" maxlength="12" value="度"></label>
+          </div>
+          <div class="form-two">
+            <label class="field">查询频率（分钟）<input id="intervalMinutes" type="number" min="5" max="1440" value="15"></label>
+            <label class="check"><input id="enabled" type="checkbox" checked> 启用后台监控</label>
+          </div>
+
+          <div class="section-divider">
+            <h3>逐级选择寝室</h3>
+          </div>
+          <div class="form-two">
+            <label class="field">校区<select id="areaSelect"></select></label>
+            <label class="field">楼栋<select id="buildingSelect"></select></label>
+          </div>
+          <div class="form-two">
+            <label class="field">楼层<select id="floorSelect"></select></label>
+            <label class="field">房间<select id="roomSelect"></select></label>
+          </div>
+          <p id="roomHint" class="description">请先配置并验证登录态，再加载校区。</p>
+
+          <details id="manualDetails" class="manual-card">
+            <summary>高级设置 / 手动接口参数</summary>
+            <div class="manual-body">
+              <label class="check"><input id="manualRoomEnabled" type="checkbox"> 使用手动参数，不经过逐级选择</label>
+              <div class="form-two">
+                <label class="field">areaId<input id="manualAreaId" autocomplete="off" placeholder="例如：2510120172541411338"></label>
+                <label class="field">buildingCode<input id="manualBuildingCode" autocomplete="off" placeholder="例如：39"></label>
+              </div>
+              <div class="form-two">
+                <label class="field">floorCode<input id="manualFloorCode" autocomplete="off" placeholder="例如：71"></label>
+                <label class="field">roomCode<input id="manualRoomCode" autocomplete="off" placeholder="例如：12598"></label>
+              </div>
+              <label class="field">房间显示名称（可选）<input id="manualRoomName" maxlength="80" placeholder="例如：厚德苑6号240"></label>
+              <p class="description">从 queryRoomSurplus 请求中取得这四个参数。platform 固定为 YUNMA_APP，无需填写。</p>
+            </div>
+          </details>
+
+          <div class="button-row left">
+            <button id="loadAreasButton" class="button button-outline">加载校区</button>
+            <button id="saveSubscriptionButton" class="button">保存订阅</button>
+            <button id="deleteSubscriptionButton" class="button button-destructive" disabled>删除</button>
+            <button id="querySubscriptionButton" class="button button-outline" disabled>立即查询</button>
+          </div>
+          <div id="queryResult" class="result empty">尚未查询。</div>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-credentials">
+      <div class="form-grid">
+        <article class="card">
+          <div class="card-header">
+            <div>
+              <h2>易校园登录态</h2>
+              <p>凭据仅保存到插件数据目录，不会在页面回显。</p>
+            </div>
+          </div>
+          <p id="credentialStatus" class="credential-state unknown">正在读取。</p>
+          <label class="field">shiroJID<input id="shiroJID" type="password" autocomplete="off" placeholder="可粘贴纯值或完整 Cookie"></label>
+          <label class="field">ymId（可选）<input id="ymId" type="password" autocomplete="off" placeholder="新版接口未携带时可留空"></label>
+          <div class="button-row left">
+            <button id="saveCredentialsButton" class="button">保存并验证</button>
+            <button id="verifyCredentialsButton" class="button button-outline">验证现有登录态</button>
+            <button id="clearCredentialsButton" class="button button-destructive">清除</button>
+          </div>
+          <p class="description">成功查询后会自动接收并保存服务端滚动更新的 shiroJID；登录失败响应不会覆盖凭据。ymId 不是 areaId。</p>
+        </article>
+
+        <article class="card">
+          <div class="card-header">
+            <div>
+              <h2>登录过期通知</h2>
+              <p>选择一个已接触过机器人的私聊作为通知目标。</p>
+            </div>
+          </div>
+          <label class="field">管理员私聊目标<select id="adminNoticeSelect"></select></label>
+          <div class="button-row left">
+            <button id="saveAdminNoticeButton" class="button">保存目标</button>
+            <button id="testNotificationButton" class="button button-outline">发送测试通知</button>
+          </div>
+          <p class="description">只显示机器人已接触过的私聊。登录态过期后仅通知一次，更新凭据后重新布防。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-history">
+      <article class="card history-card">
+        <div class="history-toolbar">
+          <label class="field grow">寝室订阅<select id="historySubscriptionSelect"></select></label>
+          <button id="loadHistoryButton" class="button button-outline">加载趋势</button>
+        </div>
+        <div class="card-header row">
+          <div>
+            <h2>近30天用电趋势</h2>
+            <p>按采样时间展示最近 30 天剩余电量变化。</p>
+          </div>
+          <span id="historyLatest" class="latest-chip empty">未加载</span>
+        </div>
+        <div class="chart-frame">
+          <canvas id="historyChart" width="1100" height="360"></canvas>
+        </div>
+        <div id="historySummary" class="description">请选择订阅并加载历史。</div>
+      </article>
+    </section>
+
+    <section class="panel" id="panel-diagnostics">
+      <article class="card">
+        <div class="card-header row">
+          <div>
+            <h2>诊断记录</h2>
+            <p>查看插件运行相关的诊断信息与异常提示。</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="diagnostic-table">
+            <thead>
+              <tr><th>时间</th><th>范围</th><th>级别</th><th>信息</th></tr>
+            </thead>
+            <tbody id="diagnosticBody"></tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+  </main>
+  <div id="toastStack" class="toast-stack"></div>
+  <script src="./app.js?v=1.3.0"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+name: astrbot_plugin_electricity_monitor
+display_name: 易校园电费监控
+desc: 监控易校园寝室剩余电量，支持多会话、多寝室和低电量提醒。
+version: v1.3.0
+author: 烟雨寒月
+repo: ""
+astrbot_version: ">=4.24.2,<5"
