@@ -498,6 +498,7 @@ function App() {
   const [historyItems, setHistoryItems] = useState<Reading[]>([]);
   const [historyUnit, setHistoryUnit] = useState("度");
   const [historySummary, setHistorySummary] = useState("请选择订阅并加载历史。");
+  const historyAutoAttemptRef = useRef("");
   const [toasts, setToasts] = useState<{id: number; message: string; kind: ToastKind}[]>([]);
 
   const toast = useCallback((message: string, kind: ToastKind = "success") => {
@@ -531,6 +532,7 @@ function App() {
   const sessionMap = useMemo(() => new Map(sessions.map((item) => [item.umo, item])), [sessions]);
   const activeCount = subscriptions.filter((item) => item.enabled).length;
   const lowestSubscription = sortedSubscriptions(subscriptions).find((item) => item.latest_value != null);
+  const selectedQuickTarget = selectedRows.find((item) => item.latest_value != null) || selectedRows[0];
 
   const loadData = useCallback(async () => {
     setRuntimeStatus("connecting");
@@ -871,6 +873,17 @@ function App() {
       editSubscription(result.subscription);
     });
 
+  const applyHistoryResult = useCallback((subscription: Subscription, items: Reading[]) => {
+    setHistoryItems(items);
+    setHistoryUnit(subscription.unit);
+    const values = items.map((item) => Number(item.value)).filter(Number.isFinite);
+    setHistorySummary(
+      values.length
+        ? `共 ${values.length} 个采样，最低 ${Math.min(...values)} ${subscription.unit}，最高 ${Math.max(...values)} ${subscription.unit}。`
+        : "最近 30 天暂无采样。",
+    );
+  }, []);
+
   const loadHistory = useCallback(
     (subscriptionId: string) =>
       runBusy("history:load", async () => {
@@ -879,16 +892,26 @@ function App() {
           subscription: Subscription;
           items: Reading[];
         }>("history", {subscription_id: subscriptionId});
-        setHistoryItems(result.items);
-        setHistoryUnit(result.subscription.unit);
-        const values = result.items.map((item) => Number(item.value));
-        setHistorySummary(
-          values.length
-            ? `共 ${values.length} 个采样，最低 ${Math.min(...values)} ${result.subscription.unit}，最高 ${Math.max(...values)} ${result.subscription.unit}。`
-            : "最近 30 天暂无采样。",
-        );
+        applyHistoryResult(result.subscription, result.items);
       }),
-    [apiPost, runBusy],
+    [apiPost, applyHistoryResult, runBusy],
+  );
+
+  const loadHistoryQuietly = useCallback(
+    async (subscriptionId: string) => {
+      if (!subscriptionId) return;
+      try {
+        const result = await apiPost<{
+          subscription: Subscription;
+          items: Reading[];
+        }>("history", {subscription_id: subscriptionId});
+        applyHistoryResult(result.subscription, result.items);
+      } catch (error) {
+        setHistoryItems([]);
+        setHistorySummary((error as Error).message || String(error));
+      }
+    },
+    [apiPost, applyHistoryResult],
   );
 
   const currentHistorySubscription = subscriptions.find(
@@ -899,6 +922,24 @@ function App() {
     time: new Date(item.captured_at * 1000).toLocaleDateString(),
     value: Number(item.value),
   }));
+
+  useEffect(() => {
+    if (runtimeStatus !== "ok") return;
+    if (!selectedQuickTarget) {
+      const emptyKey = `${revision}:${selectedUmo || "none"}:empty`;
+      if (historyAutoAttemptRef.current === emptyKey) return;
+      historyAutoAttemptRef.current = emptyKey;
+      setHistoryItems([]);
+      setHistorySummary("当前会话暂无可展示趋势的订阅。");
+      return;
+    }
+    const subscriptionId = String(selectedQuickTarget.id);
+    const attemptKey = `${revision}:${subscriptionId}`;
+    if (historyAutoAttemptRef.current === attemptKey) return;
+    historyAutoAttemptRef.current = attemptKey;
+    setHistorySubscriptionId(subscriptionId);
+    void loadHistoryQuietly(subscriptionId);
+  }, [loadHistoryQuietly, revision, runtimeStatus, selectedQuickTarget, selectedUmo]);
 
   const runtimeChip = runtimeStatus === "ok" ? (
     <Chip color="success" variant="soft">
@@ -1031,6 +1072,16 @@ function App() {
                   await loadData();
                 })
               }
+              quickTarget={selectedQuickTarget}
+              chartData={chartData}
+              historyUnit={historyUnit}
+              historySummary={historySummary}
+              refreshHistory={() => {
+                const subscriptionId = selectedQuickTarget ? String(selectedQuickTarget.id) : "";
+                setHistorySubscriptionId(subscriptionId);
+                void loadHistory(subscriptionId);
+              }}
+              openHistory={() => setTab("history")}
             />
           </Tabs.Panel>
 
@@ -1091,7 +1142,10 @@ function App() {
               subscriptions={subscriptions}
               sessions={sessions}
               historySubscriptionId={historySubscriptionId}
-              setHistorySubscriptionId={setHistorySubscriptionId}
+              setHistorySubscriptionId={(subscriptionId) => {
+                setHistorySubscriptionId(subscriptionId);
+                void loadHistoryQuietly(subscriptionId);
+              }}
               currentHistorySubscription={currentHistorySubscription}
               chartData={chartData}
               historyUnit={historyUnit}
@@ -1152,6 +1206,12 @@ function SubscriptionsPanel(props: {
   querySubscription: () => void;
   copySubscription: () => void;
   importSessions: () => void;
+  quickTarget?: Subscription;
+  chartData: {time: string; value: number}[];
+  historyUnit: string;
+  historySummary: string;
+  refreshHistory: () => void;
+  openHistory: () => void;
 }) {
   const {
     sessions,
@@ -1182,6 +1242,12 @@ function SubscriptionsPanel(props: {
     querySubscription,
     copySubscription,
     importSessions,
+    quickTarget,
+    chartData,
+    historyUnit,
+    historySummary,
+    refreshHistory,
+    openHistory,
   } = props;
 
   return (
@@ -1323,6 +1389,36 @@ function SubscriptionsPanel(props: {
                 </tbody>
               </table>
             </div>
+
+            <section className="rounded-2xl bg-surface-secondary p-4">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-foreground text-base font-semibold">
+                    {quickTarget ? `近30天用电趋势（${quickTarget.alias}）` : "近30天用电趋势"}
+                  </h3>
+                  <p className="text-muted text-sm">默认展示当前会话电量最低的寝室。</p>
+                </div>
+                <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    isDisabled={!quickTarget}
+                    isPending={busyAction === "history:load"}
+                    onPress={refreshHistory}
+                  >
+                    <ChartLine className="size-4" />
+                    刷新趋势
+                  </Button>
+                  <Button size="sm" variant="tertiary" onPress={openHistory}>
+                    更多
+                  </Button>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3">
+                <MiniHistoryChart data={chartData} height={220} unit={historyUnit} />
+                <p className="text-muted text-xs">{historySummary}</p>
+              </div>
+            </section>
 
           </Card.Content>
         </Card>
@@ -1614,7 +1710,7 @@ function HistoryPanel(props: {
             onPress={props.loadHistory}
           >
             <ChartLine className="size-4" />
-            加载趋势
+            刷新趋势
           </Button>
         </div>
       </Card.Header>
