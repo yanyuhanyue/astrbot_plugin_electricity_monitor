@@ -16,8 +16,6 @@
 @import "@heroui/styles/components/tabs.css" layer(components);
 @import "@heroui/styles/components/textfield.css" layer(components);
 @import "@heroui-pro/react/css/components/native-select.css";
-@import "@heroui-pro/react/css/components/line-chart.css";
-@import "@heroui-pro/react/css/components/chart-tooltip.css";
 
 @source "./**/*.{ts,tsx}";
 @source "../../node_modules/@heroui/react/dist/**/*.{js,mjs}";

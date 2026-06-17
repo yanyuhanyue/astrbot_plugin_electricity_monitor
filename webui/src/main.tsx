@@ -1,4 +1,4 @@
-import React, {lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState} from "react";
+import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {createRoot} from "react-dom/client";
 import {Alert} from "@heroui/react/alert";
 import {Button} from "@heroui/react/button";
@@ -35,10 +35,6 @@ import {
 } from "@gravity-ui/icons";
 
 import "./styles.css";
-
-const LazyHistoryChart = lazy(() =>
-  import("./HistoryChart").then((module) => ({default: module.HistoryChart})),
-);
 
 declare global {
   interface Window {
@@ -141,6 +137,11 @@ interface QueryReportItem {
 interface QueryReport {
   items?: QueryReportItem[];
   errors?: string[];
+}
+
+interface HistoryChartPoint {
+  time: string;
+  value: number;
 }
 
 interface EditorState {
@@ -390,10 +391,82 @@ function MetricCard({
   );
 }
 
-function ChartFallback({height}: {height: number}) {
+function MiniHistoryChart({
+  data,
+  height,
+  unit,
+}: {
+  data: HistoryChartPoint[];
+  height: number;
+  unit: string;
+}) {
+  const width = 640;
+  const top = 20;
+  const right = 24;
+  const bottom = 42;
+  const left = 56;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const points = data.filter((item) => Number.isFinite(item.value));
+  const values = points.map((item) => item.value);
+
+  if (!values.length) {
+    return (
+      <div className="text-muted flex items-center justify-center rounded-2xl bg-surface-secondary text-sm" style={{height}}>
+        暂无历史采样
+      </div>
+    );
+  }
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const padding = max === min ? Math.max(1, Math.abs(max) * 0.08) : (max - min) * 0.08;
+  const yMin = min - padding;
+  const yMax = max + padding;
+  const valueRange = yMax - yMin || 1;
+  const xAt = (index: number) => left + (points.length === 1 ? plotWidth / 2 : (index / (points.length - 1)) * plotWidth);
+  const yAt = (value: number) => top + plotHeight - ((value - yMin) / valueRange) * plotHeight;
+  const path = points
+    .map((item, index) => `${index === 0 ? "M" : "L"} ${xAt(index).toFixed(2)} ${yAt(item.value).toFixed(2)}`)
+    .join(" ");
+  const areaPath = `${path} L ${xAt(points.length - 1).toFixed(2)} ${top + plotHeight} L ${xAt(0).toFixed(2)} ${top + plotHeight} Z`;
+  const first = points[0];
+  const last = points[points.length - 1];
+  const ticks = [yMax, yMin + valueRange / 2, yMin];
+  const latest = points[points.length - 1];
+
   return (
-    <div className="text-muted flex items-center justify-center rounded-2xl bg-surface-secondary text-sm" style={{height}}>
-      正在加载趋势图...
+    <div className="rounded-2xl bg-surface-secondary p-4" style={{height}}>
+      <svg aria-label={`电量趋势图，单位 ${unit}`} className="block h-full w-full" preserveAspectRatio="none" viewBox={`0 0 ${width} ${height}`}>
+        {ticks.map((tick) => {
+          const y = yAt(tick);
+          return (
+            <g key={tick}>
+              <line stroke="var(--color-separator)" strokeWidth="1" x1={left} x2={width - right} y1={y} y2={y} />
+              <text fill="var(--color-muted)" fontSize="12" textAnchor="end" x={left - 10} y={y + 4}>
+                {tick.toFixed(1)}
+              </text>
+            </g>
+          );
+        })}
+        <path d={areaPath} fill="var(--color-accent)" opacity="0.08" />
+        <path d={path} fill="none" stroke="var(--color-accent)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
+        {points.map((item, index) => (
+          <circle key={`${item.time}-${index}`} cx={xAt(index)} cy={yAt(item.value)} fill="var(--color-background)" r="3.5" stroke="var(--color-accent)" strokeWidth="2" />
+        ))}
+        <text fill="var(--color-muted)" fontSize="12" textAnchor="start" x={left} y={height - 14}>
+          {first.time}
+        </text>
+        <text fill="var(--color-muted)" fontSize="12" textAnchor="end" x={width - right} y={height - 14}>
+          {last.time}
+        </text>
+        <g>
+          <rect fill="var(--color-background)" height="30" rx="10" width="148" x={width - right - 156} y="12" />
+          <text fill="var(--color-foreground)" fontSize="13" fontWeight="600" textAnchor="end" x={width - right - 16} y="32">
+            最新 {latest.value.toFixed(2)} {unit}
+          </text>
+        </g>
+      </svg>
     </div>
   );
 }
@@ -458,7 +531,6 @@ function App() {
   const sessionMap = useMemo(() => new Map(sessions.map((item) => [item.umo, item])), [sessions]);
   const activeCount = subscriptions.filter((item) => item.enabled).length;
   const lowestSubscription = sortedSubscriptions(subscriptions).find((item) => item.latest_value != null);
-  const selectedQuickTarget = selectedRows.find((item) => item.latest_value != null) || selectedRows[0];
 
   const loadData = useCallback(async () => {
     setRuntimeStatus("connecting");
@@ -959,18 +1031,6 @@ function App() {
                   await loadData();
                 })
               }
-              quickTarget={selectedQuickTarget}
-              chartData={chartData}
-              historyUnit={historyUnit}
-              historySummary={historySummary}
-              openHistory={() => {
-                if (selectedQuickTarget) {
-                  const subscriptionId = String(selectedQuickTarget.id);
-                  setHistorySubscriptionId(subscriptionId);
-                  void loadHistory(subscriptionId);
-                }
-                setTab("history");
-              }}
             />
           </Tabs.Panel>
 
@@ -1092,11 +1152,6 @@ function SubscriptionsPanel(props: {
   querySubscription: () => void;
   copySubscription: () => void;
   importSessions: () => void;
-  quickTarget?: Subscription;
-  chartData: {time: string; value: number}[];
-  historyUnit: string;
-  historySummary: string;
-  openHistory: () => void;
 }) {
   const {
     sessions,
@@ -1127,11 +1182,6 @@ function SubscriptionsPanel(props: {
     querySubscription,
     copySubscription,
     importSessions,
-    quickTarget,
-    chartData,
-    historyUnit,
-    historySummary,
-    openHistory,
   } = props;
 
   return (
@@ -1274,30 +1324,6 @@ function SubscriptionsPanel(props: {
               </table>
             </div>
 
-            <section className="rounded-2xl bg-surface-secondary p-4">
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-foreground text-base font-semibold">
-                    {quickTarget ? `近30天电量趋势（${quickTarget.alias}）` : "近30天电量趋势"}
-                  </h3>
-                  <p className="text-muted text-sm">优先展示当前会话电量最低的寝室。</p>
-                </div>
-                <Button size="sm" variant="secondary" onPress={openHistory}>
-                  <ChartLine className="size-4" />
-                  更多趋势
-                </Button>
-              </div>
-              <div className="flex flex-col gap-3">
-                {chartData.length ? (
-                  <Suspense fallback={<ChartFallback height={220} />}>
-                    <LazyHistoryChart data={chartData} height={220} unit={historyUnit} />
-                  </Suspense>
-                ) : (
-                  <div className="text-muted flex h-[220px] items-center justify-center text-sm">暂无历史采样</div>
-                )}
-                <p className="text-muted text-xs">{historySummary}</p>
-              </div>
-            </section>
           </Card.Content>
         </Card>
 
@@ -1600,15 +1626,7 @@ function HistoryPanel(props: {
               : "未加载"}
           </Chip>
         </div>
-        {props.chartData.length ? (
-          <Suspense fallback={<ChartFallback height={360} />}>
-            <LazyHistoryChart data={props.chartData} height={360} unit={props.historyUnit} />
-          </Suspense>
-        ) : (
-          <div className="text-muted flex h-[360px] items-center justify-center rounded-2xl bg-surface-secondary text-sm">
-            暂无历史采样
-          </div>
-        )}
+        <MiniHistoryChart data={props.chartData} height={360} unit={props.historyUnit} />
         <p className="text-muted text-sm">{props.historySummary}</p>
       </Card.Content>
     </Card>
