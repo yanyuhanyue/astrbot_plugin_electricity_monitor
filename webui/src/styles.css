@@ -1,6 +1,23 @@
 @import "tailwindcss";
-@import "@heroui/styles";
-@import "@heroui-pro/react/css";
+@import "@heroui/styles/base/base.css" layer(base);
+@import "@heroui/styles/base/scrollbar.css" layer(base);
+@import "@heroui/styles/themes/default" layer(theme);
+@import "@heroui/styles/utilities";
+@import "@heroui/styles/variants";
+@import "@heroui/styles/components/description.css" layer(components);
+@import "@heroui/styles/components/label.css" layer(components);
+@import "@heroui/styles/components/alert.css" layer(components);
+@import "@heroui/styles/components/button.css" layer(components);
+@import "@heroui/styles/components/card.css" layer(components);
+@import "@heroui/styles/components/chip.css" layer(components);
+@import "@heroui/styles/components/input.css" layer(components);
+@import "@heroui/styles/components/spinner.css" layer(components);
+@import "@heroui/styles/components/switch.css" layer(components);
+@import "@heroui/styles/components/tabs.css" layer(components);
+@import "@heroui/styles/components/textfield.css" layer(components);
+@import "@heroui-pro/react/css/components/native-select.css";
+@import "@heroui-pro/react/css/components/line-chart.css";
+@import "@heroui-pro/react/css/components/chart-tooltip.css";
 
 @source "./**/*.{ts,tsx}";
 @source "../../node_modules/@heroui/react/dist/**/*.{js,mjs}";
@@ -50,5 +67,27 @@ select {
 }
 
 .compact-table {
-  --table-row-height: 48px;
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+
+.compact-table th {
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1rem;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.compact-table td {
+  border-top: 1px solid var(--color-separator);
+  padding: 0.875rem 1rem;
+  vertical-align: middle;
+}
+
+.compact-table tbody tr:hover {
+  background: var(--color-default-hover);
 }

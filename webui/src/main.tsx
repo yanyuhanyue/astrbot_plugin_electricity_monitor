@@ -1,23 +1,17 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
+import React, {lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {createRoot} from "react-dom/client";
-import {
-  Alert,
-  Button,
-  Card,
-  Chip,
-  Description,
-  Form,
-  Input,
-  Label,
-  Spinner,
-  Switch,
-  Table,
-  Tabs,
-  TextField,
-} from "@heroui/react";
-import {ChartTooltip} from "@heroui-pro/react/chart-tooltip";
-import {KPI} from "@heroui-pro/react/kpi";
-import {LineChart} from "@heroui-pro/react/line-chart";
+import {Alert} from "@heroui/react/alert";
+import {Button} from "@heroui/react/button";
+import {Card} from "@heroui/react/card";
+import {Chip} from "@heroui/react/chip";
+import {Description} from "@heroui/react/description";
+import {Form} from "@heroui/react/form";
+import {Input} from "@heroui/react/input";
+import {Label} from "@heroui/react/label";
+import {Spinner} from "@heroui/react/spinner";
+import {Switch} from "@heroui/react/switch";
+import {Tabs} from "@heroui/react/tabs";
+import {TextField} from "@heroui/react/textfield";
 import {NativeSelect} from "@heroui-pro/react/native-select";
 import {
   Bell,
@@ -41,6 +35,10 @@ import {
 } from "@gravity-ui/icons";
 
 import "./styles.css";
+
+const LazyHistoryChart = lazy(() =>
+  import("./HistoryChart").then((module) => ({default: module.HistoryChart})),
+);
 
 declare global {
   interface Window {
@@ -355,6 +353,49 @@ function credentialLabel(credentials: CredentialState): string {
   };
   const state = String(credentials.state || "unknown");
   return labels[state] || state;
+}
+
+function MetricCard({
+  title,
+  value,
+  description,
+  icon,
+  status = "success",
+}: {
+  title: string;
+  value: number;
+  description: string;
+  icon: React.ReactNode;
+  status?: "success" | "warning" | "danger";
+}) {
+  const statusClass = {
+    success: "bg-success/10 text-success",
+    warning: "bg-warning/10 text-warning",
+    danger: "bg-danger/10 text-danger",
+  }[status];
+
+  return (
+    <Card className="rounded-2xl">
+      <Card.Content className="flex flex-col gap-3 p-4">
+        <div className="flex items-center gap-2">
+          <div className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${statusClass}`}>
+            {icon}
+          </div>
+          <span className="text-muted text-sm font-medium">{title}</span>
+        </div>
+        <div className="text-foreground text-2xl font-semibold tracking-tight">{value}</div>
+        <span className="text-muted text-xs">{description}</span>
+      </Card.Content>
+    </Card>
+  );
+}
+
+function ChartFallback({height}: {height: number}) {
+  return (
+    <div className="text-muted flex items-center justify-center rounded-2xl bg-surface-secondary text-sm" style={{height}}>
+      正在加载趋势图...
+    </div>
+  );
 }
 
 function App() {
@@ -778,11 +819,6 @@ function App() {
     [apiPost, runBusy],
   );
 
-  useEffect(() => {
-    if (!selectedQuickTarget) return;
-    void loadHistory(String(selectedQuickTarget.id));
-  }, [selectedQuickTarget?.id]);
-
   const currentHistorySubscription = subscriptions.find(
     (item) => String(item.id) === String(historySubscriptionId),
   );
@@ -838,62 +874,22 @@ function App() {
         </header>
 
         <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="运行概览">
-          <KPI>
-            <KPI.Header>
-              <KPI.Icon status="success">
-                <Persons />
-              </KPI.Icon>
-              <KPI.Title>近期会话</KPI.Title>
-            </KPI.Header>
-            <KPI.Content>
-              <KPI.Value value={sessions.length} />
-            </KPI.Content>
-            <KPI.Footer>
-              <span className="text-muted text-xs">当前会话数量</span>
-            </KPI.Footer>
-          </KPI>
-          <KPI>
-            <KPI.Header>
-              <KPI.Icon status="success">
-                <House />
-              </KPI.Icon>
-              <KPI.Title>寝室订阅</KPI.Title>
-            </KPI.Header>
-            <KPI.Content>
-              <KPI.Value value={subscriptions.length} />
-            </KPI.Content>
-            <KPI.Footer>
-              <span className="text-muted text-xs">已订阅寝室数量</span>
-            </KPI.Footer>
-          </KPI>
-          <KPI>
-            <KPI.Header>
-              <KPI.Icon status={activeCount ? "success" : "warning"}>
-                <ShieldCheck />
-              </KPI.Icon>
-              <KPI.Title>监控中</KPI.Title>
-            </KPI.Header>
-            <KPI.Content>
-              <KPI.Value value={activeCount} />
-            </KPI.Content>
-            <KPI.Footer>
-              <span className="text-muted text-xs">正在监控的寝室</span>
-            </KPI.Footer>
-          </KPI>
-          <KPI>
-            <KPI.Header>
-              <KPI.Icon status={diagnostics.length ? "warning" : "success"}>
-                <Database />
-              </KPI.Icon>
-              <KPI.Title>诊断记录</KPI.Title>
-            </KPI.Header>
-            <KPI.Content>
-              <KPI.Value value={diagnostics.length} />
-            </KPI.Content>
-            <KPI.Footer>
-              <span className="text-muted text-xs">历史诊断记录数</span>
-            </KPI.Footer>
-          </KPI>
+          <MetricCard title="近期会话" value={sessions.length} description="当前会话数量" icon={<Persons className="size-4" />} />
+          <MetricCard title="寝室订阅" value={subscriptions.length} description="已订阅寝室数量" icon={<House className="size-4" />} />
+          <MetricCard
+            title="监控中"
+            value={activeCount}
+            description="正在监控的寝室"
+            icon={<ShieldCheck className="size-4" />}
+            status={activeCount ? "success" : "warning"}
+          />
+          <MetricCard
+            title="诊断记录"
+            value={diagnostics.length}
+            description="历史诊断记录数"
+            icon={<Database className="size-4" />}
+            status={diagnostics.length ? "warning" : "success"}
+          />
         </section>
 
         {lowestSubscription && Number(lowestSubscription.latest_value) <= Number(lowestSubscription.threshold) ? (
@@ -968,7 +964,11 @@ function App() {
               historyUnit={historyUnit}
               historySummary={historySummary}
               openHistory={() => {
-                if (selectedQuickTarget) setHistorySubscriptionId(String(selectedQuickTarget.id));
+                if (selectedQuickTarget) {
+                  const subscriptionId = String(selectedQuickTarget.id);
+                  setHistorySubscriptionId(subscriptionId);
+                  void loadHistory(subscriptionId);
+                }
                 setTab("history");
               }}
             />
@@ -1206,36 +1206,28 @@ function SubscriptionsPanel(props: {
             <Chip variant="soft">{selectedRows.length}</Chip>
           </Card.Header>
           <Card.Content className="flex flex-col gap-4">
-            <Table variant="secondary" className="compact-table">
-              <Table.ScrollContainer>
-                <Table.Content
-                  aria-label="当前会话订阅"
-                  className="min-w-[880px] [&_th]:whitespace-nowrap [&_th]:break-keep"
-                >
-                  <Table.Header>
-                    <Table.Column id="alias" isRowHeader>别名</Table.Column>
-                    <Table.Column id="latest">最新电量</Table.Column>
-                    <Table.Column id="threshold">阈值 / 频率</Table.Column>
-                    <Table.Column id="status">状态</Table.Column>
-                    <Table.Column id="action">操作</Table.Column>
-                  </Table.Header>
-                  <Table.Body
-                    items={selectedRows}
-                    renderEmptyState={() => (
-                      <div className="text-muted flex h-24 items-center justify-center text-sm">
-                        当前会话尚未配置寝室。
-                      </div>
-                    )}
-                  >
-                    {(item) => (
-                      <Table.Row id={item.id}>
-                        <Table.Cell>
+            <div className="overflow-x-auto rounded-2xl bg-surface-secondary">
+              <table className="compact-table min-w-[880px]" aria-label="当前会话订阅">
+                <thead>
+                  <tr>
+                    <th scope="col">别名</th>
+                    <th scope="col">最新电量</th>
+                    <th scope="col">阈值 / 频率</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedRows.length ? (
+                    selectedRows.map((item) => (
+                      <tr key={item.id}>
+                        <td>
                           <div className="flex flex-col gap-1">
                             <span className="font-medium">{item.alias}</span>
                             <span className="text-muted mono-wrap text-xs">{roomTitle(item.room)}</span>
                           </div>
-                        </Table.Cell>
-                        <Table.Cell>
+                        </td>
+                        <td>
                           <div className="flex flex-col gap-1">
                             <span className="font-medium whitespace-nowrap">
                               {item.latest_value == null
@@ -1250,31 +1242,37 @@ function SubscriptionsPanel(props: {
                             </span>
                             {item.last_error ? <span className="text-danger text-xs">{item.last_error}</span> : null}
                           </div>
-                        </Table.Cell>
-                        <Table.Cell>
+                        </td>
+                        <td>
                           <div className="flex flex-col gap-1">
                             <span className="whitespace-nowrap">{item.threshold} {item.unit}</span>
                             <span className="text-muted whitespace-nowrap text-xs">{item.interval_seconds / 60} 分钟</span>
                           </div>
-                        </Table.Cell>
-                        <Table.Cell>
+                        </td>
+                        <td>
                           <div className="flex flex-col items-start gap-1 whitespace-nowrap">
                             <StatusChip subscription={item} />
                             {item.alerted ? <span className="text-warning text-xs">已触发低电量提醒</span> : null}
                           </div>
-                        </Table.Cell>
-                        <Table.Cell>
+                        </td>
+                        <td>
                           <Button className="whitespace-nowrap" size="sm" variant="tertiary" onPress={() => editSubscription(item)}>
                             <Gear className="size-4" />
                             编辑
                           </Button>
-                        </Table.Cell>
-                      </Table.Row>
-                    )}
-                  </Table.Body>
-                </Table.Content>
-              </Table.ScrollContainer>
-            </Table>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="text-muted h-24 text-center text-sm" colSpan={5}>
+                        当前会话尚未配置寝室。
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
             <section className="rounded-2xl bg-surface-secondary p-4">
               <div className="mb-4 flex items-start justify-between gap-3">
@@ -1291,13 +1289,9 @@ function SubscriptionsPanel(props: {
               </div>
               <div className="flex flex-col gap-3">
                 {chartData.length ? (
-                  <LineChart data={chartData} height={220}>
-                    <LineChart.Grid vertical={false} />
-                    <LineChart.XAxis dataKey="time" tickMargin={8} />
-                    <LineChart.YAxis width={48} />
-                    <LineChart.Line dataKey="value" dot={false} name={`电量（${historyUnit}）`} stroke="var(--color-accent)" strokeWidth={2} type="monotone" />
-                    <LineChart.Tooltip content={<LineChart.TooltipContent />} />
-                  </LineChart>
+                  <Suspense fallback={<ChartFallback height={220} />}>
+                    <LazyHistoryChart data={chartData} height={220} unit={historyUnit} />
+                  </Suspense>
                 ) : (
                   <div className="text-muted flex h-[220px] items-center justify-center text-sm">暂无历史采样</div>
                 )}
@@ -1607,29 +1601,9 @@ function HistoryPanel(props: {
           </Chip>
         </div>
         {props.chartData.length ? (
-          <LineChart data={props.chartData} height={360}>
-            <LineChart.Grid vertical={false} />
-            <LineChart.XAxis dataKey="time" tickMargin={8} />
-            <LineChart.YAxis width={56} />
-            <LineChart.Line dataKey="value" dot={false} name={`电量（${props.historyUnit}）`} stroke="var(--color-accent)" strokeWidth={2} type="monotone" />
-            <LineChart.Tooltip
-              content={({active, label, payload}: any) => {
-                if (!active || !payload?.length) return null;
-                return (
-                  <ChartTooltip>
-                    <ChartTooltip.Header>{label}</ChartTooltip.Header>
-                    {payload.map((entry: any) => (
-                      <ChartTooltip.Item key={String(entry.dataKey)}>
-                        <ChartTooltip.Indicator color={entry.color ?? entry.stroke} />
-                        <ChartTooltip.Label>{entry.name}</ChartTooltip.Label>
-                        <ChartTooltip.Value>{Number(entry.value).toFixed(2)}</ChartTooltip.Value>
-                      </ChartTooltip.Item>
-                    ))}
-                  </ChartTooltip>
-                );
-              }}
-            />
-          </LineChart>
+          <Suspense fallback={<ChartFallback height={360} />}>
+            <LazyHistoryChart data={props.chartData} height={360} unit={props.historyUnit} />
+          </Suspense>
         ) : (
           <div className="text-muted flex h-[360px] items-center justify-center rounded-2xl bg-surface-secondary text-sm">
             暂无历史采样
@@ -1649,33 +1623,36 @@ function DiagnosticsPanel({diagnostics}: {diagnostics: Diagnostic[]}) {
         <Card.Description>查看插件运行相关的诊断信息与异常提示。</Card.Description>
       </Card.Header>
       <Card.Content>
-        <Table variant="secondary">
-          <Table.ScrollContainer>
-            <Table.Content aria-label="诊断记录" className="min-w-[860px]">
-              <Table.Header>
-                <Table.Column id="time">时间</Table.Column>
-                <Table.Column id="scope">范围</Table.Column>
-                <Table.Column id="level">级别</Table.Column>
-                <Table.Column id="message" isRowHeader>信息</Table.Column>
-              </Table.Header>
-              <Table.Body
-                items={diagnostics}
-                renderEmptyState={() => (
-                  <div className="text-muted flex h-24 items-center justify-center text-sm">暂无诊断。</div>
-                )}
-              >
-                {(item) => (
-                  <Table.Row id={item.id || `${item.created_at}-${item.scope}-${item.message}`}>
-                    <Table.Cell>{formatTime(item.created_at)}</Table.Cell>
-                    <Table.Cell><Chip size="sm" variant="soft">{item.scope}</Chip></Table.Cell>
-                    <Table.Cell><Chip color={levelColor(item.level)} size="sm" variant="soft">{item.level}</Chip></Table.Cell>
-                    <Table.Cell><span className="mono-wrap">{item.message}</span></Table.Cell>
-                  </Table.Row>
-                )}
-              </Table.Body>
-            </Table.Content>
-          </Table.ScrollContainer>
-        </Table>
+        <div className="overflow-x-auto rounded-2xl bg-surface-secondary">
+          <table className="compact-table min-w-[860px]" aria-label="诊断记录">
+            <thead>
+              <tr>
+                <th scope="col">时间</th>
+                <th scope="col">范围</th>
+                <th scope="col">级别</th>
+                <th scope="col">信息</th>
+              </tr>
+            </thead>
+            <tbody>
+              {diagnostics.length ? (
+                diagnostics.map((item) => (
+                  <tr key={item.id || `${item.created_at}-${item.scope}-${item.message}`}>
+                    <td>{formatTime(item.created_at)}</td>
+                    <td><Chip size="sm" variant="soft">{item.scope}</Chip></td>
+                    <td><Chip color={levelColor(item.level)} size="sm" variant="soft">{item.level}</Chip></td>
+                    <td><span className="mono-wrap">{item.message}</span></td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="text-muted h-24 text-center text-sm" colSpan={4}>
+                    暂无诊断。
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </Card.Content>
     </Card>
   );
