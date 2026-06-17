@@ -319,20 +319,20 @@ function TextInput({
 function StatusChip({subscription}: {subscription: Subscription}) {
   if (!subscription.enabled) {
     return (
-      <Chip size="sm" variant="soft">
+      <Chip className="whitespace-nowrap" size="sm" variant="soft">
         已停用
       </Chip>
     );
   }
   if (subscription.last_error) {
     return (
-      <Chip color="danger" size="sm" variant="soft">
+      <Chip className="whitespace-nowrap" color="danger" size="sm" variant="soft">
         异常
       </Chip>
     );
   }
   return (
-    <Chip color="success" size="sm" variant="soft">
+    <Chip className="whitespace-nowrap" color="success" size="sm" variant="soft">
       监控中
     </Chip>
   );
@@ -911,9 +911,12 @@ function App() {
 
         <Tabs selectedKey={tab} onSelectionChange={(key) => setTab(String(key) as TabKey)}>
           <Tabs.ListContainer>
-            <Tabs.List aria-label="电费监控管理页面" className="w-fit">
+            <Tabs.List
+              aria-label="电费监控管理页面"
+              className="w-fit *:min-w-20 *:whitespace-nowrap *:break-keep *:text-center [&_.tabs__tab]:whitespace-nowrap [&_.tabs__tab]:break-keep"
+            >
               <Tabs.Tab id="subscriptions">订阅<Tabs.Indicator /></Tabs.Tab>
-              <Tabs.Tab id="credentials">登录与通知<Tabs.Indicator /></Tabs.Tab>
+              <Tabs.Tab id="credentials" className="min-w-28">登录与通知<Tabs.Indicator /></Tabs.Tab>
               <Tabs.Tab id="history">趋势<Tabs.Indicator /></Tabs.Tab>
               <Tabs.Tab id="diagnostics">诊断<Tabs.Indicator /></Tabs.Tab>
             </Tabs.List>
@@ -1205,7 +1208,10 @@ function SubscriptionsPanel(props: {
           <Card.Content className="flex flex-col gap-4">
             <Table variant="secondary" className="compact-table">
               <Table.ScrollContainer>
-                <Table.Content aria-label="当前会话订阅" className="min-w-[760px]">
+                <Table.Content
+                  aria-label="当前会话订阅"
+                  className="min-w-[880px] [&_th]:whitespace-nowrap [&_th]:break-keep"
+                >
                   <Table.Header>
                     <Table.Column id="alias" isRowHeader>别名</Table.Column>
                     <Table.Column id="latest">最新电量</Table.Column>
@@ -1231,7 +1237,7 @@ function SubscriptionsPanel(props: {
                         </Table.Cell>
                         <Table.Cell>
                           <div className="flex flex-col gap-1">
-                            <span className="font-medium">
+                            <span className="font-medium whitespace-nowrap">
                               {item.latest_value == null
                                 ? item.last_error
                                   ? "查询失败"
@@ -1247,18 +1253,18 @@ function SubscriptionsPanel(props: {
                         </Table.Cell>
                         <Table.Cell>
                           <div className="flex flex-col gap-1">
-                            <span>{item.threshold} {item.unit}</span>
-                            <span className="text-muted text-xs">{item.interval_seconds / 60} 分钟</span>
+                            <span className="whitespace-nowrap">{item.threshold} {item.unit}</span>
+                            <span className="text-muted whitespace-nowrap text-xs">{item.interval_seconds / 60} 分钟</span>
                           </div>
                         </Table.Cell>
                         <Table.Cell>
-                          <div className="flex flex-col gap-1">
+                          <div className="flex flex-col items-start gap-1 whitespace-nowrap">
                             <StatusChip subscription={item} />
                             {item.alerted ? <span className="text-warning text-xs">已触发低电量提醒</span> : null}
                           </div>
                         </Table.Cell>
                         <Table.Cell>
-                          <Button size="sm" variant="tertiary" onPress={() => editSubscription(item)}>
+                          <Button className="whitespace-nowrap" size="sm" variant="tertiary" onPress={() => editSubscription(item)}>
                             <Gear className="size-4" />
                             编辑
                           </Button>
