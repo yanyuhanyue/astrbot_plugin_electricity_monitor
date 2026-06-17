@@ -30,7 +30,7 @@ PLUGIN_NAME = "astrbot_plugin_electricity_monitor"
     PLUGIN_NAME,
     "烟雨寒月",
     "监控易校园寝室剩余电量，支持多会话、多寝室和低电量提醒。",
-    "1.3.0",
+    "1.4.0",
 )
 class ElectricityMonitorPlugin(Star):
     def __init__(

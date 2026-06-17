@@ -19,8 +19,7 @@
 - 新增或修改订阅后立即执行首次查询，无需等待后台调度。
 - Dashboard 可将已有寝室订阅复制到另一个私聊或群聊会话。
 - Dashboard 默认打开最低电量订阅所在会话，并按低电量优先排序。
-- Dashboard UI 改为卡片化仪表盘布局，统计、列表和编辑区更清晰。
-- Dashboard v1.3.0 使用 Tailwind CSS 与 shadcn 风格组件重构管理页，统一卡片、表单、表格、标签和诊断样式。
+- Dashboard v1.4.0 使用 HeroUI / HeroUI Pro 与 Tailwind CSS v4 重构管理页，统一卡片、表单、表格、标签、趋势图和诊断样式。
 - 会话导入会规范化 AstrBot 旧式嵌套 UMO，避免把群号误识别为私聊。
 - 校区级联使用 `queryArea.rows[].id` 查询楼栋，兼容同时返回不同 `areaId` 的部署。
 
@@ -101,6 +100,9 @@ https://application.xiaofubao.com/app/electric/queryRoomSurplus
 ## 开发检查
 
 ```bash
+npm install
+npm run check:webui
+npm run build:webui
 python -m unittest discover -s tests -v
 python -m compileall -q main.py core tests
 node --check pages/electricity-monitor/app.js

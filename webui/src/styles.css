@@ -1,0 +1,54 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+@import "@heroui-pro/react/css";
+
+@source "./**/*.{ts,tsx}";
+@source "../../node_modules/@heroui/react/dist/**/*.{js,mjs}";
+@source "../../node_modules/@heroui-pro/react/dist/**/*.{js,mjs}";
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family:
+    Inter,
+    "Microsoft YaHei",
+    "PingFang SC",
+    system-ui,
+    sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.plugin-shell {
+  min-height: 100vh;
+  background: var(--color-background);
+}
+
+.page-width {
+  width: min(100%, 1440px);
+  margin-inline: auto;
+}
+
+.mono-wrap {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.compact-table {
+  --table-row-height: 48px;
+}

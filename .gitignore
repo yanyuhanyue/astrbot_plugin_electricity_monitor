@@ -26,10 +26,9 @@ data/
 logs/
 *.log
 
-# Frontend build dependencies and temporary package files
+# Frontend build dependencies
 node_modules/
 .npm/
-package-lock.json
 
 # Build and release artifacts
 build/
