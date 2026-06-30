@@ -101,7 +101,9 @@ class ElectricityStore:
                         REFERENCES subscriptions(id) ON DELETE CASCADE,
                     last_scan_at INTEGER NOT NULL DEFAULT 0,
                     last_success_at INTEGER NOT NULL DEFAULT 0,
-                    last_error TEXT NOT NULL DEFAULT ''
+                    last_error TEXT NOT NULL DEFAULT '',
+                    last_alert_at INTEGER NOT NULL DEFAULT 0,
+                    last_alert_error TEXT NOT NULL DEFAULT ''
                 );
 
                 CREATE TABLE IF NOT EXISTS readings (
@@ -148,6 +150,18 @@ class ElectricityStore:
                 connection,
                 "readings",
                 "balance_text",
+                "TEXT NOT NULL DEFAULT ''",
+            )
+            self._ensure_column(
+                connection,
+                "subscription_runtime",
+                "last_alert_at",
+                "INTEGER NOT NULL DEFAULT 0",
+            )
+            self._ensure_column(
+                connection,
+                "subscription_runtime",
+                "last_alert_error",
                 "TEXT NOT NULL DEFAULT ''",
             )
 
@@ -503,6 +517,8 @@ class ElectricityStore:
                     rt.last_scan_at,
                     rt.last_success_at,
                     rt.last_error,
+                    rt.last_alert_at,
+                    rt.last_alert_error,
                     r.area_id, r.area_name, r.building_code, r.building_name,
                     r.floor_code, r.floor_name, r.room_code, r.room_name,
                     (
@@ -551,6 +567,8 @@ class ElectricityStore:
         data["last_scan_at"] = int(data.get("last_scan_at") or 0)
         data["last_success_at"] = int(data.get("last_success_at") or 0)
         data["last_error"] = str(data.get("last_error") or "")
+        data["last_alert_at"] = int(data.get("last_alert_at") or 0)
+        data["last_alert_error"] = str(data.get("last_alert_error") or "")
         data["latest_at"] = int(data.get("latest_at") or 0)
         data["latest_balance"] = str(data.get("latest_balance") or "")
         return data
@@ -562,6 +580,8 @@ class ElectricityStore:
         last_scan_at: int | None = None,
         last_success_at: int | None = None,
         last_error: str | None = None,
+        last_alert_at: int | None = None,
+        last_alert_error: str | None = None,
     ) -> None:
         with self._lock, self._connect() as connection:
             connection.execute(
@@ -579,6 +599,12 @@ class ElectricityStore:
             if last_error is not None:
                 assignments.append("last_error = ?")
                 params.append(str(last_error)[:2000])
+            if last_alert_at is not None:
+                assignments.append("last_alert_at = ?")
+                params.append(int(last_alert_at))
+            if last_alert_error is not None:
+                assignments.append("last_alert_error = ?")
+                params.append(str(last_alert_error)[:2000])
             if assignments:
                 params.append(int(subscription_id))
                 connection.execute(

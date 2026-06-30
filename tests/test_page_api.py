@@ -168,10 +168,14 @@ class PageApiTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_route_registration_is_complete(self):
         self.api.register_routes()
-        self.assertEqual(len(self.context.routes), 15)
+        self.assertEqual(len(self.context.routes), 16)
         paths = [item[0] for item in self.context.routes]
         self.assertIn("/astrbot_plugin_electricity_monitor/credentials/save", paths)
         self.assertIn("/astrbot_plugin_electricity_monitor/history", paths)
+        self.assertIn(
+            "/astrbot_plugin_electricity_monitor/notification/test-session",
+            paths,
+        )
 
     async def test_unknown_session_is_rejected(self):
         self.request.payload = {
@@ -287,6 +291,21 @@ class PageApiTests(unittest.IsolatedAsyncioTestCase):
         result = await guarded()
         self.assertEqual(result["status"], "error")
         self.assertEqual(result["code"], 400)
+
+    async def test_test_session_notification_uses_selected_umo(self):
+        sent = []
+
+        async def send(umo, text):
+            sent.append((umo, text))
+            return True
+
+        self.service.send_callback = send
+        self.request.payload = {"umo": "qq:FriendMessage:1"}
+
+        result = await self.api.test_session_notification()
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(sent[0][0], "qq:FriendMessage:1")
 
 
 if __name__ == "__main__":

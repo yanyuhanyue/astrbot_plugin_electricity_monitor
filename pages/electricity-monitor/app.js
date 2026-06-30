@@ -227,10 +227,18 @@
       const statusCell = document.createElement("td");
       const statusClass = item.enabled ? (item.last_error ? "error" : "ok") : "muted";
       statusCell.append(pill(status, `status-pill ${statusClass}`));
+      if (item.last_alert_error) {
+        const note = document.createElement("div");
+        note.className = "status-note error";
+        note.textContent = `提醒发送失败：${item.last_alert_error}`;
+        statusCell.append(note);
+      }
       if (item.alerted) {
         const note = document.createElement("div");
         note.className = "status-note";
-        note.textContent = "已触发低电量提醒";
+        note.textContent = item.last_alert_at
+          ? `已发送低电量提醒\n${formatTime(item.last_alert_at)}`
+          : "已触发低电量提醒（旧状态，等待下次确认）";
         statusCell.append(note);
       }
       row.append(statusCell);
@@ -772,6 +780,11 @@
     const result = await apiPost("sessions/import");
     toast(result.message);
     await loadData();
+  }));
+  $("#testSessionNotificationButton").addEventListener("click", () => busy($("#testSessionNotificationButton"), async () => {
+    if (!state.selectedUmo) throw new Error("请先选择要测试的会话。");
+    const result = await apiPost("notification/test-session", { umo: state.selectedUmo });
+    toast(result.message);
   }));
   $("#newSubscriptionButton").addEventListener("click", () => {
     resetEditor();

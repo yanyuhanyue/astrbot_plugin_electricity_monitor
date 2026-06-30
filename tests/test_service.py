@@ -148,7 +148,21 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         second = await service.scan_due(now=1300)
         self.assertEqual(first["alerts"], 0)
         self.assertEqual(second["alerts"], 1)
-        self.assertTrue(self.store.get_subscription(subscription["id"])["alerted"])
+        saved = self.store.get_subscription(subscription["id"])
+        self.assertTrue(saved["alerted"])
+        self.assertEqual(saved["last_alert_at"], 1300)
+        self.assertEqual(saved["last_alert_error"], "")
+
+    async def test_legacy_alerted_without_timestamp_retries_once(self):
+        subscription = self.subscribe("qq:GroupMessage:1", "240")
+        self.store.set_alerted(subscription["id"], True)
+        service = ElectricityMonitorService(self.store, FakeClient(["19"]), self.send)
+        report = await service.scan_due(now=1000)
+        saved = self.store.get_subscription(subscription["id"])
+        self.assertEqual(report["alerts"], 1)
+        self.assertEqual(len(self.sent), 1)
+        self.assertTrue(saved["alerted"])
+        self.assertEqual(saved["last_alert_at"], 1000)
 
     async def test_manual_query_does_not_consume_background_alert(self):
         subscription = self.subscribe("qq:GroupMessage:1", "240")

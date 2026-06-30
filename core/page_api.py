@@ -42,6 +42,7 @@ class PluginPageApi:
             ("history", self.history, ["POST"], "读取电量历史"),
             ("settings/admin-notice", self.save_admin_notice, ["POST"], "保存管理员通知目标"),
             ("notification/test", self.test_notification, ["POST"], "发送测试通知"),
+            ("notification/test-session", self.test_session_notification, ["POST"], "发送当前会话测试通知"),
         )
         for endpoint, handler, methods, description in routes:
             self.plugin.context.register_web_api(
@@ -300,6 +301,15 @@ class PluginPageApi:
         if not success:
             raise RuntimeError("主动消息发送返回失败。")
         return self._ok({"message": "测试通知已发送。"})
+
+    async def test_session_notification(self):
+        await self._require_dashboard_admin()
+        payload = await self._json_payload()
+        target = self._known_umo(payload)
+        success = await self._service().send_test_notification(target)
+        if not success:
+            raise RuntimeError("当前会话主动消息发送返回失败。")
+        return self._ok({"message": "当前会话测试通知已发送。"})
 
     async def _verify_login_state(self) -> dict[str, Any]:
         subscriptions = self._store().list_subscriptions()

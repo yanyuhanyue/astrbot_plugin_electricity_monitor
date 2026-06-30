@@ -20,7 +20,7 @@ from .core import (
     SessionImporter,
     decimal_text,
 )
-from .core.session_identity import session_display_name
+from .core.session_identity import parse_session_identity, session_display_name
 
 
 PLUGIN_NAME = "astrbot_plugin_electricity_monitor"
@@ -205,11 +205,100 @@ class ElectricityMonitorPlugin(Star):
         yield event.plain_result(message)
 
     async def _send_text(self, umo: str, text: str) -> bool:
+        direct_result = await self._send_text_via_onebot(umo, text)
+        if direct_result is not None:
+            return direct_result
         result = await self.context.send_message(
             umo,
             MessageChain([Comp.Plain(text)]),
         )
-        return bool(result)
+        success, reason = self._send_result_success(result)
+        if not success:
+            logger.warning(f"[易校园电费监控] 主动消息发送返回失败：{reason}")
+        return success
+
+    async def _send_text_via_onebot(self, umo: str, text: str) -> bool | None:
+        identity = parse_session_identity(umo)
+        if not identity or not str(identity.get("session_id") or "").isdigit():
+            return None
+        platform = self._find_platform(identity["platform"])
+        bot = getattr(platform, "bot", None) if platform else None
+        if bot is None:
+            return None
+        payload = [{"type": "text", "data": {"text": text}}]
+        session_id = int(identity["session_id"])
+        try:
+            if identity["chat_type"] == "group":
+                sender = getattr(bot, "send_group_msg", None)
+                if not callable(sender):
+                    return None
+                result = await sender(group_id=session_id, message=payload)
+            else:
+                sender = getattr(bot, "send_private_msg", None)
+                if not callable(sender):
+                    return None
+                result = await sender(user_id=session_id, message=payload)
+        except Exception as exc:
+            logger.warning(f"[易校园电费监控] 主动消息发送异常：{exc}")
+            return False
+        success, reason = self._send_result_success(result)
+        if not success:
+            logger.warning(f"[易校园电费监控] 主动消息发送返回失败：{reason}")
+        return success
+
+    def _find_platform(self, platform_id: str):
+        manager = getattr(self.context, "platform_manager", None)
+        if manager is None:
+            return None
+        platforms = getattr(manager, "platform_insts", None)
+        if platforms is None and callable(getattr(manager, "get_insts", None)):
+            platforms = manager.get_insts()
+        for platform in platforms or []:
+            meta_getter = getattr(platform, "meta", None)
+            try:
+                meta = meta_getter() if callable(meta_getter) else None
+            except Exception:
+                meta = None
+            values = {
+                str(getattr(meta, "id", "") or "").casefold(),
+                str(getattr(meta, "name", "") or "").casefold(),
+            }
+            if str(platform_id).casefold() in values:
+                return platform
+        return None
+
+    @staticmethod
+    def _send_result_success(result: Any) -> tuple[bool, str]:
+        if result is None or result is True:
+            return True, ""
+        if result is False:
+            return False, "返回 False"
+        if isinstance(result, dict):
+            status = str(result.get("status", "") or "").casefold()
+            retcode = result.get("retcode")
+            if retcode is not None:
+                try:
+                    if int(retcode) != 0:
+                        return False, str(
+                            result.get("wording")
+                            or result.get("message")
+                            or f"retcode={retcode}"
+                        )
+                except (TypeError, ValueError):
+                    return False, f"retcode={retcode}"
+            if status and status not in {"ok", "async", "success"}:
+                return False, str(
+                    result.get("wording") or result.get("message") or status
+                )
+            data = result.get("data")
+            if isinstance(data, dict):
+                nested_ok, nested_reason = ElectricityMonitorPlugin._send_result_success(
+                    data
+                )
+                if not nested_ok:
+                    return nested_ok, nested_reason
+            return True, ""
+        return bool(result), "返回空值" if not result else ""
 
     def _list_latest(self, umo: str) -> str:
         assert self.store

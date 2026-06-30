@@ -77,6 +77,10 @@
     @apply text-sm text-muted-foreground;
   }
 
+  .status-note.error {
+    @apply text-destructive;
+  }
+
   .eyebrow {
     @apply text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground;
   }

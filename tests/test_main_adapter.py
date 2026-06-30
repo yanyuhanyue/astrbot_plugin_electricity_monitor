@@ -72,10 +72,35 @@ def install_astrbot_stubs():
 class FakeContext:
     def __init__(self):
         self.calls = []
+        self.platform_manager = types.SimpleNamespace(platform_insts=[])
 
     async def send_message(self, umo, chain):
         self.calls.append((umo, chain))
         return True
+
+
+class FakeBot:
+    def __init__(self, result):
+        self.result = result
+        self.private_calls = []
+        self.group_calls = []
+
+    async def send_private_msg(self, **kwargs):
+        self.private_calls.append(kwargs)
+        return self.result
+
+    async def send_group_msg(self, **kwargs):
+        self.group_calls.append(kwargs)
+        return self.result
+
+
+class FakePlatform:
+    def __init__(self, bot, platform_id="qq"):
+        self.bot = bot
+        self._platform_id = platform_id
+
+    def meta(self):
+        return types.SimpleNamespace(id=self._platform_id, name=self._platform_id)
 
 
 class FakeEvent:
@@ -160,7 +185,24 @@ class MainAdapterTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(await self.plugin._send_text("qq:FriendMessage:1", "测试"))
         self.assertIsInstance(self.context.calls[0][1][0], self.Plain)
 
+    async def test_send_text_prefers_onebot_direct_response(self):
+        bot = FakeBot({"status": "ok", "retcode": 0, "data": {"message_id": 123}})
+        self.context.platform_manager.platform_insts = [FakePlatform(bot)]
+
+        self.assertTrue(await self.plugin._send_text("qq:FriendMessage:21", "测试"))
+
+        self.assertEqual(self.context.calls, [])
+        self.assertEqual(bot.private_calls[0]["user_id"], 21)
+
+    async def test_send_text_rejects_onebot_failure_response(self):
+        bot = FakeBot({"status": "failed", "retcode": 1200, "wording": "发送失败"})
+        self.context.platform_manager.platform_insts = [FakePlatform(bot)]
+
+        self.assertFalse(await self.plugin._send_text("qq:FriendMessage:21", "测试"))
+
+        self.assertEqual(self.context.calls, [])
+        self.assertEqual(bot.private_calls[0]["user_id"], 21)
+
 
 if __name__ == "__main__":
     unittest.main()
-

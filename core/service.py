@@ -210,6 +210,7 @@ class ElectricityMonitorService:
                     subscription,
                     reading,
                     send_alerts=send_alerts,
+                    now=now,
                 )
                 report["alerts"] += int(alert_sent)
                 report["items"].append(
@@ -240,13 +241,22 @@ class ElectricityMonitorService:
         reading: Reading,
         *,
         send_alerts: bool,
+        now: int,
     ) -> bool:
         threshold = Decimal(subscription["threshold"])
         if reading.value > threshold:
             if subscription["alerted"]:
                 self.store.set_alerted(subscription["id"], False)
+                self.store.update_runtime(
+                    subscription["id"],
+                    last_alert_error="",
+                )
             return False
-        if subscription["alerted"] or not send_alerts:
+        legacy_unconfirmed_alert = (
+            subscription["alerted"]
+            and int(subscription.get("last_alert_at") or 0) <= 0
+        )
+        if (subscription["alerted"] and not legacy_unconfirmed_alert) or not send_alerts:
             return False
         text = (
             "电量提醒\n"
@@ -264,7 +274,16 @@ class ElectricityMonitorService:
             error = "" if success else "消息发送返回失败"
         if success:
             self.store.set_alerted(subscription["id"], True)
+            self.store.update_runtime(
+                subscription["id"],
+                last_alert_at=now,
+                last_alert_error="",
+            )
             return True
+        self.store.update_runtime(
+            subscription["id"],
+            last_alert_error=error,
+        )
         self.store.add_diagnostic(
             subscription["umo"],
             f"低电量提醒发送失败：{error}",
